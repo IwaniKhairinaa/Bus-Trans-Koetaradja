@@ -1,0 +1,56 @@
+name: bus_trans_koetaradja
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  laravel-tests:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up PHP
+      uses: shivammathur/setup-php@v2
+      with:
+        php-version: '8.2'  # Menggunakan versi PHP sesuai dengan di docker-compose.yml
+        extensions: sqlite3, mysql # Ekstensi yang diperlukan untuk SQLite dan MySQL
+
+    - name: Copy .env
+      run: php -r "file_exists('.env') || copy('.env.example', '.env');"
+
+    - name: Install Composer Dependencies
+      run: composer install -q --no-ansi --no-interaction --no-scripts --no-progress --prefer-dist
+
+    - name: Generate App Key
+      run: php artisan key:generate
+
+    - name: Set Directory Permissions
+      run: chmod -R 777 storage bootstrap/cache
+
+    - name: Set up Database Environment
+      run: |
+        echo "DB_CONNECTION=mysql" >> .env
+        echo "DB_HOST=127.0.0.1" >> .env
+        echo "DB_PORT=3306" >> .env
+        echo "DB_DATABASE=bus_trans_koetaradja" >> .env
+        echo "DB_USERNAME=root" >> .env
+        echo "DB_PASSWORD=${{ secrets.DB_PASSWORD }}" >> .env  # Mengambil password dari GitHub Secrets
+
+    - name: Set up SQLite for Testing
+      run: |
+        mkdir -p database
+        touch database/database.sqlite
+        echo "DB_CONNECTION=sqlite" >> .env
+        echo "DB_DATABASE=database/database.sqlite" >> .env
+
+    - name: Run Tests (Unit and Feature tests)
+      env:
+        DB_CONNECTION: sqlite
+        DB_DATABASE: database/database.sqlite
+        APP_ENV: testing
+      run: php artisan test
